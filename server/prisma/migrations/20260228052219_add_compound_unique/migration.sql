@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "credits" DROP NOT NULL,
+ALTER COLUMN "credits" DROP DEFAULT;
