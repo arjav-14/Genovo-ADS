@@ -6,12 +6,6 @@ import { useNavigate } from 'react-router-dom';
 export default function Hero() {
     const navigate = useNavigate();
 
-    const trustedUserImages = [
-        'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=50',
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50',
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=50&h=50&fit=crop'
-    ];
-
     const mainImageUrl = 'https://images.unsplash.com/photo-1576267423445-b2e0074d68a4?q=80&w=1600&auto=format&fit=crop';
 
     const galleryStripImages = [

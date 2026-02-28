@@ -1,4 +1,3 @@
-import { Link } from 'lucide-react';
 import { footerLinks } from '../assets/dummy-data';
 import { motion } from 'framer-motion';
 

@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2Icon, SparklesIcon } from 'lucide-react';
 
 function Loading() {
-  const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
