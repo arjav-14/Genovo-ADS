@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon --exec tsx server.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc && cp configs/instrument.mjs dist/configs/",
     "start": "node dist/server.js"
   },
   "keywords": [],
