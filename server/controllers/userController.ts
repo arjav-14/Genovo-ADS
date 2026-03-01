@@ -9,10 +9,23 @@ export const getUserCredits = async (req : Request, res : Response) => {
             return res.status(401).json({message : "Unauthorized"})
         }
 
-        const user = await prisma.user.findUnique({
+        let user = await prisma.user.findUnique({
             where : {id : userId},
             select : {credits : true}
         })
+
+        // Create user if doesn't exist
+        if(!user){
+            user = await prisma.user.create({
+                data: {
+                    id: userId,
+                    email: req.auth?.sessionClaims?.email || "",
+                    credits: 10 // Give new users 10 credits
+                },
+                select: {credits: true}
+            });
+        }
+
         return res.status(200).json({credits : user?.credits || 0})
     }
     catch(error : any){

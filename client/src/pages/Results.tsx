@@ -144,34 +144,20 @@ const Results = () => {
                   <>
                     <video
                       src={project.generatedVideo}
+                      controls
                       loop
                       playsInline
-                      className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                      onMouseEnter={(e) => {
-                        const video = e.currentTarget;
-                        video.play().catch(() => {
-                          console.log("Autoplay prevented, user interaction required");
-                        });
-                      }}
-                      onMouseLeave={(e) => e.currentTarget.pause()}
+                      muted
+                      preload="metadata"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      poster={project.generatedImage}
                     />
-                    {/* Play button overlay for better UX */}
+                    {/* Mobile play button overlay */}
                     <div 
-                      className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const video = e.currentTarget.parentElement?.querySelector('video');
-                        if (video) {
-                          if (video.paused) {
-                            video.play();
-                          } else {
-                            video.pause();
-                          }
-                        }
-                      }}
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none md:hidden"
                     >
-                      <div className="bg-black/50 rounded-full p-4 pointer-events-auto cursor-pointer hover:bg-black/70 transition">
-                        <PlayIcon className="w-8 h-8 text-white" />
+                      <div className="bg-black/50 rounded-full p-3 animate-pulse">
+                        <PlayIcon className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   </>
