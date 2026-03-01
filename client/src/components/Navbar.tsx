@@ -222,6 +222,11 @@ export default function Navbar() {
               {user?.firstName || user?.emailAddresses?.[0]?.emailAddress}
             </span>
 
+            <div className="flex items-center gap-2 text-gray-300">
+              <span className="text-sm">Credits:</span>
+              <span className="text-sm font-semibold text-green-400">{credits}</span>
+            </div>
+
             <button
               onClick={() => signOut()}
               className="text-red-400"
