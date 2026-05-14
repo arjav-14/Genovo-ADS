@@ -72,7 +72,7 @@ function ProjectCard({
       if (!token) return;
 
       const { data } = await axios.post(
-        `/api/project/publish`,
+        `/api/user/publish/${gen.id}`,
         { projectId: gen.id },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -100,8 +100,8 @@ function ProjectCard({
       if (!token) return;
 
       const { data } = await axios.post(
-        `/api/project/unpublish`,
-        { projectId: gen.id },
+        `/api/project/unpublish/${gen.id}`,
+        {},
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -214,14 +214,27 @@ function ProjectCard({
                 src={gen.generatedVideo}
                 loop
                 playsInline
+                muted
+                controls
+                autoPlay={false}
                 className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition duration-500"
                 onMouseEnter={(e) => {
                   const video = e.currentTarget;
+                  // Enhanced mobile video handling
+                  video.setAttribute('playsinline', 'true');
+                  video.setAttribute('webkit-playsinline', 'true');
                   video.play().catch(() => {
                     console.log("Autoplay prevented, user interaction required");
                   });
                 }}
                 onMouseLeave={(e) => e.currentTarget.pause()}
+                // Add mobile touch support
+                onTouchStart={(e) => {
+                  const video = e.currentTarget;
+                  video.play().catch(() => {
+                    console.log("Touch play initiated");
+                  });
+                }}
               />
               {/* Play button overlay for better UX */}
               <div 

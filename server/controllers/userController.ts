@@ -8,7 +8,7 @@ export const getUserCredits = async (req : Request, res : Response) => {
         if(!userId){
             return res.status(401).json({message : "Unauthorized"})
         }
-
+        
         let user = await prisma.user.findUnique({
             where : {id : userId},
             select : {credits : true}
@@ -111,6 +111,49 @@ export const toggleProjectPublic = async (req : Request, res : Response) => {
         res.json({isPublished : !project.isPublished})
     }
     catch(error : any){
+        Sentry.captureException(error);
+        return res.status(500).json({message : error.message || "Internal Server Error"})
+    }
+}
+
+export const unpublishProject = async (req: Request, res: Response) => {
+    console.log(" Unpublish request received:", { 
+        method: req.method, 
+        url: req.originalUrl, 
+        params: req.params, 
+        body: req.body,
+        user: req.auth
+    });
+    
+    try{
+        const userIdRawAuth = (req.auth as any)?.userId ?? (req.auth as any);
+        const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth[0] : userIdRawAuth;
+        const projectIdRaw = req.params.projectId;
+        const projectId = Array.isArray(projectIdRaw) ? projectIdRaw[0] : projectIdRaw;
+        if(!projectId){
+            return res.status(400).json({message : "projectId is required"})
+        }
+        if(!userId){
+            return res.status(401).json({message : "Unauthorized"})
+        }
+        console.log(" Looking for project:", { projectId, userId });
+        const project = await prisma.project.findFirst({
+            where: {id : projectId, userId}
+        })
+        console.log(" Project found:", project ? "YES" : "NO");
+        if(!project){
+            return res.status(404).json({message : "Project not found"})
+        }
+        console.log(" Updating project isPublished to false");
+        await prisma.project.update({
+            where : {id : projectId},
+            data : {isPublished : false}
+        })
+        console.log(" Project unpublished successfully");
+        res.json({isPublished : false})
+    }
+    catch(error : any){
+        console.error(" Unpublish error:", error);
         Sentry.captureException(error);
         return res.status(500).json({message : error.message || "Internal Server Error"})
     }

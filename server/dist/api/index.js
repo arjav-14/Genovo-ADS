@@ -1,5 +1,6 @@
-import "./configs/instrument.mjs";
-import "dotenv/config";
+import "../configs/instrument.mjs";
+import dotenv from "dotenv";
+dotenv.config();
 import express from 'express';
 import cors from "cors";
 import { clerkMiddleware } from '@clerk/express';

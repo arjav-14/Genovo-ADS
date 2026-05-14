@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon --exec tsx server.ts",
-    "build": "prisma generate && tsc && cp configs/instrument.mjs dist/configs/",
-    "start": "node dist/server.js"
+    "build": "prisma generate && tsc && xcopy configs dist\\configs /E /I /Y",
+    "start": "node dist/api/index.js"
   },
   "keywords": [],
   "author": "",

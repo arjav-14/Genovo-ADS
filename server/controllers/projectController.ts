@@ -20,21 +20,18 @@ const loadImage = (path : string , mimeType : string)=>{
 
 export const createProject = async (req: express.Request, res: express.Response) => {
     let tempProjectId: string;
-  const userIdRawAuth = (req.auth as any)?.userId ?? (req.auth as any);
-  const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth[0] : userIdRawAuth;
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  let isCreditDeducted = false;
+    const userIdRawAuth = (req as any)?.userId ?? (req as any);
+    const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth[0] : userIdRawAuth;
+    let isCreditDeducted = false;
 
-  const {
-    name = 'New Project',
-    aspectRatio,
-    userPrompt,
-    productName,
-    productDescription,
-    targetLength = 5
-  } = req.body;
+    const {
+        name = 'New Project',
+        aspectRatio,
+        userPrompt,
+        productName,
+        productDescription,
+        targetLength = 5
+    } = req.body;
 
   // Handle files from .fields() - req.files is now an object with field names as keys
   const filesObj = req.files as { [fieldname: string]: Express.Multer.File[] } || {};
@@ -56,6 +53,7 @@ export const createProject = async (req: express.Request, res: express.Response)
         isCreditDeducted = true;
     })
   }
+    let response;
     try{
         let uploadedImages = await Promise.all(
             images.map((item: any) => {
@@ -121,53 +119,119 @@ export const createProject = async (req: express.Request, res: express.Response)
             Output ecommerce-quality photo relastic imagery.
             ${userPrompt}`
         }
-        //generate the image using the ai model
-        const response = await ai.models.generateContent({model ,
-            contents : [prompt , img1base64 , img2base64] ,
-            config : generationConfig,
-        })
-        //check if the response is valid
-        if(!response?.candidates?.[0]?.content?.parts){
-            throw new Error("Invalid response from AI model")
-        }
-        const parts = response.candidates[0].content.parts;
-        let finalBuffer: Buffer | null = null;
-        for(const part of parts){
-            if(part.inlineData?.data){
-                finalBuffer = Buffer.from(part.inlineData.data , 'base64')
+        // Try different models in order of preference
+        const modelsToTry = [
+            "veo-3.0-fast-generate-001",
+            "veo-3.1-lite-generate-001", 
+            "veo-3.1-generate-preview"
+        ];
+        
+        let retryCount = 0;
+        const maxRetries = 3;
+        const retryDelay = 2000; // 2 seconds
+
+        for (const currentModel of modelsToTry) {
+            retryCount = 0;
+            console.log(`Trying model: ${currentModel}`);
+            
+            while (retryCount < maxRetries) {
+                try {
+                    if(currentModel === "veo-3.0-fast-generate-001"){
+                        response = await ai.models.generateVideos({
+                            model: currentModel,
+                            prompt: prompt.text,
+                            image: {
+                                imageBytes: img1base64.inlineData.data,
+                                mimeType: img1base64.inlineData.mimeType
+                            },
+                            config: {  
+                                aspectRatio: aspectRatio || "9:16",
+                                numberOfVideos: 1,
+                                resolution: '720p'
+                            } 
+                        });
+                    }else{
+                        response = await ai.models.generateContent({
+                            model: currentModel,
+                            contents: [prompt, img1base64, img2base64],
+                            config: generationConfig,
+                        });
+                    }
+                    console.log(`Success with model: ${currentModel}`);
+                    break; // Success, exit all loops
+                } catch (error: any) {
+                    retryCount++;
+                    console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+                    
+                    if (error.message.includes('503') || error.message.includes('high demand')) {
+                        if (retryCount < maxRetries) {
+                            console.log(`Retrying ${currentModel} in ${retryDelay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, retryDelay));
+                            continue;
+                        }
+                    }
+                    throw error; // Re-throw if it's not a 503 error or max retries reached
+                }
             }
         }
-        if(!finalBuffer){
-            throw new Error("No image data found in AI response");
-        }
-        const base64Image = `data:image/png;base64,${finalBuffer.toString('base64')}`;
-        const uploadResult = await cloudinary.uploader.upload(base64Image , {
-            resource_type : "image"
-        })
-        await prisma.project.update({
-            where : {id : tempProjectId},
-            data :{
-                generatedImage : uploadResult.secure_url,
-                isGenerating : false
-             } 
-        })
-        res.json({projectId : project.id})
-    }
-    catch(error : any){
-        if(tempProjectId!){
-            await prisma.project.update({
-                where : {id : tempProjectId},
-                data : {isGenerating : false , error : error.message}
-            })
-        }
-        if(isCreditDeducted){
-            await prisma.user.update({
-                where : {id : userId},
-                data : {credits : {increment : 5}}
-            })
+    } catch (error: any) {
+        try {
+            if(tempProjectId!){
+                await prisma.project.update({
+                    where :{id : tempProjectId},
+                    data : {isGenerating : false , error : error.message}
+                })
+            }
+            if(isCreditDeducted){
+                await prisma.user.update({
+                    where :{id : userId},
+                    data : {credits : {increment : 5}}
+                })
+            }
+        } catch (updateError: any) {
+            console.error('Error updating project and user:', updateError);
         }
         Sentry.captureException(error);
         return res.status(500).json({message : error.message || "Internal Server Error"})
+    }
+    
+    if (response) {
+        // Update project with generated content and mark as not generating
+        let generatedImageUrl = null;
+        
+        // Handle different response types
+        if ('response' in response && response.response) {
+            const resp = response.response as any;
+            if (resp.generatedImages?.[0]?.image) {
+                // GenerateContentResponse type
+                generatedImageUrl = resp.generatedImages[0].image;
+            } else if (resp.generatedVideos?.[0]?.video) {
+                // GenerateVideosOperation type - convert video to image URL if needed
+                // For now, we'll store the video URL in generatedImage field
+                generatedImageUrl = resp.generatedVideos[0].video;
+            }
+        }
+        
+        await prisma.project.update({
+            where: { id: tempProjectId },
+            data: { 
+                isGenerating: false,
+                generatedImage: generatedImageUrl
+            }
+        });
+        
+        const updatedProject = await prisma.project.findUnique({
+            where: { id: tempProjectId }
+        });
+        
+        res.json({message : "Project created successfully" , project: updatedProject});
+    } else {
+        // Handle case where no response was generated
+        await prisma.project.update({
+            where: { id: tempProjectId },
+            data: { isGenerating: false, error: "Failed to generate content" }
+        });
+        res.status(500).json({message : "Failed to generate content"});
     }
 }
 
@@ -175,16 +239,16 @@ export const createVideo = async (req: express.Request, res: express.Response) =
     const userIdRawAuth = (req.auth as any)?.userId ?? (req.auth as any);
     const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth[0] : userIdRawAuth;
     if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
+        return res.status(401).json({ message: "Unauthorized" });
     }
     const projectIdRaw = req.body.projectId || req.params.projectId;
     const projectId = Array.isArray(projectIdRaw) ? projectIdRaw[0] : projectIdRaw;
     let isCreditDeducted = false;
     const user = await prisma.user.findUnique({
-        where : {id : userId}
+        where: { id: userId }
     })
-    if(!user || (user.credits ?? 0) < 10){
-        return res.status(404).json({message : "User not found or insufficient credits"})
+    if (!user || (user.credits ?? 0) < 10) {
+        return res.status(404).json({ message: "User not found or insufficient credits" })
     }
     //deduct credit for video generation                                                                                qddg
     const VIDEO_GENERATION_COST = 10; // Define cost as constant for easy maintenance
@@ -206,8 +270,7 @@ export const createVideo = async (req: express.Request, res: express.Response) =
     })
     try{
         const project = await prisma.project.findFirst({
-            where : {id : projectId, userId},
-            include : {user : true}
+            where : {id : projectId, userId}
         })
         if(!project){
             return res.status(404).json({message : "Project not found"})
@@ -223,24 +286,45 @@ export const createVideo = async (req: express.Request, res: express.Response) =
              data : {isGenerating : true}
         })
         const prompt = `Create a 15-second dynamic video showcasing the product ${project.productName}. ${project.productDescription && `Product Description: ${project.productDescription}`}. The person should naturally demonstrate or interact with the product with smooth movements and engaging actions. Make it cinematic and professional. Generate the video in English language with English text and audio if any.`
-        const model = "veo-3.1-generate-preview";
+        const model = "veo-3.0-fast-generate-001";
         if(!project.generatedImage){
             throw new Error("No generated image found for this project")
         }
         const image = await axios.get(project.generatedImage , {responseType : 'arraybuffer'});
         const imageBytes : any = Buffer.from(image.data)
 
-        let operation : any = await ai.models.generateVideos({
-            model , prompt , image : {
-                imageBytes : imageBytes.toString('base64'),
-                mimeType : 'image/png'
-            },
-            config : {  
-                aspectRatio : project.aspectRatio || "9:16",
-                numberOfVideos : 1,
-                resolution : '720p'
-            } 
-        })
+        let operation : any;
+        let retryCount = 0;
+        const maxRetries = 5; // Increased retries for video generation
+        const retryDelay = 5000; // 5 seconds delay
+
+        while (retryCount < maxRetries) {
+            try {
+                operation = await ai.models.generateVideos({
+                    model , prompt , image : {
+                        imageBytes : imageBytes.toString('base64'),
+                        mimeType : 'image/png'
+                    },
+                    config : {  
+                        aspectRatio : project.aspectRatio || "9:16",
+                        numberOfVideos : 1,
+                        resolution : '720p'
+                    } 
+                });
+                console.log(`Video generation API call succeeded on attempt ${retryCount + 1}`);
+                break; // Success, exit retry loop
+            } catch (error: any) {
+                retryCount++;
+                console.log(`Video generation API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+                
+                if ((error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) && retryCount < maxRetries) {
+                    console.log(`Retrying video generation in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
+                }
+                throw error; // Re-throw if not retryable or max retries reached
+            }
+        }
 
         console.log("Initial video operation:", JSON.stringify(operation, null, 2));
 
@@ -387,7 +471,7 @@ export const unpublishProject = async (req: express.Request, res: express.Respon
             return res.status(401).json({message : "Unauthorized"});
         }
         
-        const projectIdRaw = req.body.projectId;
+        const projectIdRaw = req.params.projectId;
         const projectId: string = Array.isArray(projectIdRaw) ? projectIdRaw[0] : projectIdRaw;
         
         if(!projectId){
