@@ -117,41 +117,33 @@ export const createProject = async (req: express.Request, res: express.Response)
         const prompt = {
             text : `Combine the person and the product into relastic photo.
             Make the person naturally hold or use the product.
-            Match lighting , shadows , scale and perspective.
-            Make the person stand in the professional studio lighting.
+            Match lighting, shadows, scale and perspective.
+            Make the person stand in professional studio lighting.
             Output ecommerce-quality photo relastic imagery.
             ${userPrompt}`
         }
 
-        const currentModel = "veo-3.0-fast-generate-001";
+        const model = 'gemini-3-pro-image-preview';
         let retryCount = 0;
         const maxRetries = 3;
         const retryDelay = 2000; // 2 seconds
 
         while (retryCount < maxRetries) {
             try {
-                console.log(`Trying model: ${currentModel} (attempt ${retryCount + 1})`);
-                response = await ai.models.generateVideos({
-                    model: currentModel,
-                    prompt: prompt.text,
-                    image: {
-                        imageBytes: img1base64.inlineData.data,
-                        mimeType: img1base64.inlineData.mimeType
-                    },
-                    config: {
-                        aspectRatio: aspectRatio || "9:16",
-                        numberOfVideos: 1,
-                        resolution: '720p'
-                    }
+                console.log(`Trying model: ${model} (attempt ${retryCount + 1})`);
+                response = await ai.models.generateContent({
+                    model: model,
+                    contents: [prompt, img1base64, img2base64],
+                    config: generationConfig,
                 });
-                console.log(`Success with model: ${currentModel}`);
+                console.log(`Success with model: ${model}`);
                 break;
             } catch (error: any) {
                 retryCount++;
                 console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
                 
                 if ((error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) && retryCount < maxRetries) {
-                    console.log(`Retrying ${currentModel} in ${retryDelay}ms...`);
+                    console.log(`Retrying ${model} in ${retryDelay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     continue;
                 }
