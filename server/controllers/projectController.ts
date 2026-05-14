@@ -20,8 +20,11 @@ const loadImage = (path : string , mimeType : string)=>{
 
 export const createProject = async (req: express.Request, res: express.Response) => {
     let tempProjectId: string;
-    const userIdRawAuth = (req as any)?.userId ?? (req as any);
-    const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth[0] : userIdRawAuth;
+    const userIdRawAuth = (req.auth as any)?.userId ?? (req as any)?.userId;
+    const userId = Array.isArray(userIdRawAuth) ? userIdRawAuth?.[0] : userIdRawAuth;
+    if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
     let isCreditDeducted = false;
 
     const {
