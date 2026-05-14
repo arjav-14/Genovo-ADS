@@ -133,8 +133,10 @@ export const createProject = async (req: express.Request, res: express.Response)
         let retryCount = 0;
         const maxRetries = 3;
         const retryDelay = 2000; // 2 seconds
+        let generationSucceeded = false;
 
         for (const currentModel of modelsToTry) {
+            if (generationSucceeded) break;
             retryCount = 0;
             console.log(`Trying model: ${currentModel}`);
             
@@ -162,7 +164,8 @@ export const createProject = async (req: express.Request, res: express.Response)
                         });
                     }
                     console.log(`Success with model: ${currentModel}`);
-                    break; // Success, exit all loops
+                    generationSucceeded = true;
+                    break; // Success, exit retry loop
                 } catch (error: any) {
                     retryCount++;
                     console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
