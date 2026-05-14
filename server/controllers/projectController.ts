@@ -82,7 +82,6 @@ export const createProject = async (req: express.Request, res: express.Response)
         })
         tempProjectId = project.id;
 
-        const model = 'gemini-3-pro-image-preview';
         const generationConfig : GenerateContentConfig = {
             maxOutputTokens : 32768,
             temperature : 1,
