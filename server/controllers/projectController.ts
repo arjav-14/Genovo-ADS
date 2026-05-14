@@ -125,9 +125,10 @@ export const createProject = async (req: express.Request, res: express.Response)
         // Try different models in order of preference
         const modelsToTry = [
             "veo-3.0-fast-generate-001",
-            "veo-3.1-lite-generate-001", 
+            "veo-3.1-lite-generate-001",
             "veo-3.1-generate-preview"
         ];
+        const videoModels = new Set(modelsToTry);
         
         let retryCount = 0;
         const maxRetries = 3;
@@ -139,7 +140,7 @@ export const createProject = async (req: express.Request, res: express.Response)
             
             while (retryCount < maxRetries) {
                 try {
-                    if(currentModel === "veo-3.0-fast-generate-001"){
+                    if (videoModels.has(currentModel)) {
                         response = await ai.models.generateVideos({
                             model: currentModel,
                             prompt: prompt.text,
@@ -147,13 +148,13 @@ export const createProject = async (req: express.Request, res: express.Response)
                                 imageBytes: img1base64.inlineData.data,
                                 mimeType: img1base64.inlineData.mimeType
                             },
-                            config: {  
+                            config: {
                                 aspectRatio: aspectRatio || "9:16",
                                 numberOfVideos: 1,
                                 resolution: '720p'
-                            } 
+                            }
                         });
-                    }else{
+                    } else {
                         response = await ai.models.generateContent({
                             model: currentModel,
                             contents: [prompt, img1base64, img2base64],
@@ -166,14 +167,14 @@ export const createProject = async (req: express.Request, res: express.Response)
                     retryCount++;
                     console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
                     
-                    if (error.message.includes('503') || error.message.includes('high demand')) {
+                    if (error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) {
                         if (retryCount < maxRetries) {
                             console.log(`Retrying ${currentModel} in ${retryDelay}ms...`);
                             await new Promise(resolve => setTimeout(resolve, retryDelay));
                             continue;
                         }
                     }
-                    throw error; // Re-throw if it's not a 503 error or max retries reached
+                    throw error; // Re-throw if it's not a retryable error or max retries reached
                 }
             }
         }
