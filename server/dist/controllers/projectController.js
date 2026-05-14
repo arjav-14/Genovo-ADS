@@ -268,17 +268,37 @@ export const createVideo = async (req, res) => {
         }
         const image = await axios.get(project.generatedImage, { responseType: 'arraybuffer' });
         const imageBytes = Buffer.from(image.data);
-        let operation = await ai.models.generateVideos({
-            model, prompt, image: {
-                imageBytes: imageBytes.toString('base64'),
-                mimeType: 'image/png'
-            },
-            config: {
-                aspectRatio: project.aspectRatio || "9:16",
-                numberOfVideos: 1,
-                resolution: '720p'
+        let operation;
+        let retryCount = 0;
+        const maxRetries = 5; // Increased retries for video generation
+        const retryDelay = 5000; // 5 seconds delay
+        while (retryCount < maxRetries) {
+            try {
+                operation = await ai.models.generateVideos({
+                    model, prompt, image: {
+                        imageBytes: imageBytes.toString('base64'),
+                        mimeType: 'image/png'
+                    },
+                    config: {
+                        aspectRatio: project.aspectRatio || "9:16",
+                        numberOfVideos: 1,
+                        resolution: '720p'
+                    }
+                });
+                console.log(`Video generation API call succeeded on attempt ${retryCount + 1}`);
+                break; // Success, exit retry loop
             }
-        });
+            catch (error) {
+                retryCount++;
+                console.log(`Video generation API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+                if ((error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) && retryCount < maxRetries) {
+                    console.log(`Retrying video generation in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
+                }
+                throw error; // Re-throw if not retryable or max retries reached
+            }
+        }
         console.log("Initial video operation:", JSON.stringify(operation, null, 2));
         // poll for completion with a max attempts timeout to avoid infinite loops
         const maxAttempts = 60; // ~10 minutes with 10s interval
