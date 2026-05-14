@@ -122,63 +122,40 @@ export const createProject = async (req: express.Request, res: express.Response)
             Output ecommerce-quality photo relastic imagery.
             ${userPrompt}`
         }
-        // Try different models in order of preference
-        const modelsToTry = [
-            "veo-3.0-fast-generate-001",
-            "veo-3.1-lite-generate-001",
-            "veo-3.1-generate-preview"
-        ];
-        const videoModels = new Set(modelsToTry);
-        
+
+        const currentModel = "veo-3.0-fast-generate-001";
         let retryCount = 0;
         const maxRetries = 3;
         const retryDelay = 2000; // 2 seconds
-        let generationSucceeded = false;
 
-        for (const currentModel of modelsToTry) {
-            if (generationSucceeded) break;
-            retryCount = 0;
-            console.log(`Trying model: ${currentModel}`);
-            
-            while (retryCount < maxRetries) {
-                try {
-                    if (videoModels.has(currentModel)) {
-                        response = await ai.models.generateVideos({
-                            model: currentModel,
-                            prompt: prompt.text,
-                            image: {
-                                imageBytes: img1base64.inlineData.data,
-                                mimeType: img1base64.inlineData.mimeType
-                            },
-                            config: {
-                                aspectRatio: aspectRatio || "9:16",
-                                numberOfVideos: 1,
-                                resolution: '720p'
-                            }
-                        });
-                    } else {
-                        response = await ai.models.generateContent({
-                            model: currentModel,
-                            contents: [prompt, img1base64, img2base64],
-                            config: generationConfig,
-                        });
+        while (retryCount < maxRetries) {
+            try {
+                console.log(`Trying model: ${currentModel} (attempt ${retryCount + 1})`);
+                response = await ai.models.generateVideos({
+                    model: currentModel,
+                    prompt: prompt.text,
+                    image: {
+                        imageBytes: img1base64.inlineData.data,
+                        mimeType: img1base64.inlineData.mimeType
+                    },
+                    config: {
+                        aspectRatio: aspectRatio || "9:16",
+                        numberOfVideos: 1,
+                        resolution: '720p'
                     }
-                    console.log(`Success with model: ${currentModel}`);
-                    generationSucceeded = true;
-                    break; // Success, exit retry loop
-                } catch (error: any) {
-                    retryCount++;
-                    console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
-                    
-                    if (error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) {
-                        if (retryCount < maxRetries) {
-                            console.log(`Retrying ${currentModel} in ${retryDelay}ms...`);
-                            await new Promise(resolve => setTimeout(resolve, retryDelay));
-                            continue;
-                        }
-                    }
-                    throw error; // Re-throw if it's not a retryable error or max retries reached
+                });
+                console.log(`Success with model: ${currentModel}`);
+                break;
+            } catch (error: any) {
+                retryCount++;
+                console.log(`AI API call failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+                
+                if ((error.message.includes('503') || error.message.includes('high demand') || error.message.includes('UNAVAILABLE')) && retryCount < maxRetries) {
+                    console.log(`Retrying ${currentModel} in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
                 }
+                throw error;
             }
         }
     } catch (error: any) {
@@ -231,7 +208,11 @@ export const createProject = async (req: express.Request, res: express.Response)
             where: { id: tempProjectId }
         });
         
-        res.json({message : "Project created successfully" , project: updatedProject});
+        res.json({
+            message: "Project created successfully",
+            project: updatedProject,
+            projectId: updatedProject?.id
+        });
     } else {
         // Handle case where no response was generated
         await prisma.project.update({
