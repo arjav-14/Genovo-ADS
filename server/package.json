@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon --exec tsx server.ts",
-    "build": "prisma generate && tsc && xcopy configs dist\\configs /E /I /Y",
+    "build": "prisma generate && tsc && node --input-type=module -e \"import { cpSync } from 'fs'; cpSync('configs', 'dist/configs', { recursive: true });\"",
     "start": "node dist/api/index.js"
   },
   "keywords": [],
