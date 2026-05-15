@@ -326,8 +326,7 @@ export const createVideo = async (req: express.Request, res: express.Response) =
                         durationSeconds: videoLength,
                         personGeneration: "allow_all",
                         generateAudio: true,
-                        resolution: "720p",
-                        seed: 0
+                        resolution: "720p"
                     }
                 });
                 console.log(`Video generation API call succeeded on attempt ${retryCount + 1}`);
