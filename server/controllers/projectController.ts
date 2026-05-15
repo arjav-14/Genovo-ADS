@@ -325,7 +325,6 @@ export const createVideo = async (req: express.Request, res: express.Response) =
                         numberOfVideos: 1,
                         durationSeconds: videoLength,
                         personGeneration: "allow_all",
-                        generateAudio: true,
                         resolution: "720p"
                     }
                 });
