@@ -132,7 +132,10 @@ export const createProject = async (req: express.Request, res: express.Response)
                 console.log(`Trying model: ${model} (attempt ${retryCount + 1})`);
                 response = await ai.models.generateContent({
                     model: model,
-                    contents: [prompt, img1base64, img2base64],
+                    contents: [{
+                        role: 'user',
+                        parts: [prompt, img1base64, img2base64]
+                    }],
                     config: generationConfig,
                 });
                 console.log(`Success with model: ${model}`);
@@ -175,17 +178,40 @@ export const createProject = async (req: express.Request, res: express.Response)
         // Update project with generated content and mark as not generating
         let generatedImageUrl = null;
         
-        // Handle different response types
-        if ('response' in response && response.response) {
-            const resp = response.response as any;
-            if (resp.generatedImages?.[0]?.image) {
-                // GenerateContentResponse type
-                generatedImageUrl = resp.generatedImages[0].image;
-            } else if (resp.generatedVideos?.[0]?.video) {
-                // GenerateVideosOperation type - convert video to image URL if needed
-                // For now, we'll store the video URL in generatedImage field
-                generatedImageUrl = resp.generatedVideos[0].video;
+        // Handle different response types and extract generated content
+        const resp = (response as any).response || (response as any);
+        let imageBytes = null;
+
+        if (resp.generatedImages?.[0]) {
+            const genImg = resp.generatedImages[0];
+            imageBytes = genImg.image?.imageBytes || genImg.image;
+        } else if (resp.candidates?.[0]?.content?.parts) {
+            const part = resp.candidates[0].content.parts.find((p: any) => p.inlineData);
+            if (part) {
+                imageBytes = part.inlineData.data;
             }
+        }
+
+        if (imageBytes && typeof imageBytes === 'string') {
+            console.log("Image data found, uploading to Cloudinary...");
+            try {
+                // Remove prefix if it exists to avoid double prefixing
+                const cleanBase64 = imageBytes.startsWith('data:') 
+                    ? imageBytes 
+                    : `data:image/png;base64,${imageBytes}`;
+                
+                const uploadResult = await cloudinary.uploader.upload(cleanBase64, {
+                    resource_type: "image",
+                });
+                generatedImageUrl = uploadResult.secure_url;
+                console.log("Generated image uploaded to Cloudinary:", generatedImageUrl);
+            } catch (uploadError) {
+                console.error("Cloudinary upload failed for generated image:", uploadError);
+            }
+        } else if (resp.generatedVideos?.[0]?.video) {
+            // GenerateVideosOperation type - convert video to image URL if needed
+            // For now, we'll store the video URL in generatedImage field
+            generatedImageUrl = resp.generatedVideos[0].video;
         }
         
         await prisma.project.update({
