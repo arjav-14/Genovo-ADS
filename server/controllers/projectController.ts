@@ -124,7 +124,7 @@ export const createProject = async (req: express.Request, res: express.Response)
 
         const model = 'gemini-3-pro-image-preview';
         let retryCount = 0;
-        const maxRetries = 3;
+        const maxRetries = 4;
         const retryDelay = 2000; // 2 seconds
 
         while (retryCount < maxRetries) {
@@ -150,11 +150,12 @@ export const createProject = async (req: express.Request, res: express.Response)
             }
         }
     } catch (error: any) {
+        console.error('Project creation error:', error);
         try {
             if(tempProjectId!){
                 await prisma.project.update({
                     where :{id : tempProjectId},
-                    data : {isGenerating : false , error : error.message}
+                    data : {isGenerating : false , error : error.message || "AI generation failed"}
                 })
             }
             if(isCreditDeducted){
@@ -167,7 +168,7 @@ export const createProject = async (req: express.Request, res: express.Response)
             console.error('Error updating project and user:', updateError);
         }
         Sentry.captureException(error);
-        return res.status(500).json({message : error.message || "Internal Server Error"})
+        return res.status(500).json({message : error.message || "AI generation failed. Please try again."})
     }
     
     if (response) {
