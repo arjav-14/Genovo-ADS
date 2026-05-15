@@ -291,16 +291,16 @@ export const createVideo = async (req: express.Request, res: express.Response) =
             where: { id: project.id },
             data: { isGenerating: true }
         })
-        // const prompt = `Create a 15-second dynamic video showcasing the product ${project.productName}. ${project.productDescription && `Product Description: ${project.productDescription}`}. The person should naturally demonstrate or interact with the product with smooth movements and engaging actions. Make it cinematic and professional. Generate the video in English language with English text and audio if any.`
-        const videoLength = Number(project.targetLength) || 15;
+            // const prompt = `Create a 15-second dynamic video showcasing the product ${project.productName}. ${project.productDescription && `Product Description: ${project.productDescription}`}. The person should naturally demonstrate or interact with the product with smooth movements and engaging actions. Make it cinematic and professional. Generate the video in English language with English text and audio if any.`
+            ;
 
         const prompt = `
-        Create a ${videoLength}-second dynamic video showcasing the product ${project.productName}.
+        Create a dynamic video showcasing the product ${project.productName}.
         ${project.productDescription ? `Product Description: ${project.productDescription}.` : ""}
         The person should naturally demonstrate or interact with the product with smooth movements and engaging actions.
         Make it cinematic and professional.
         Generate the video in English language with English text and audio if any.
-        The video MUST be exactly ${videoLength} seconds long.`;
+        The video MUST be exactly 20-30 seconds long.`;
         const model = "veo-3.0-fast-generate-001";
         if (!project.generatedImage) {
             throw new Error("No generated image found for this project")
@@ -323,8 +323,6 @@ export const createVideo = async (req: express.Request, res: express.Response) =
                     config: {
                         aspectRatio: project.aspectRatio || "9:16",
                         numberOfVideos: 1,
-                        durationSeconds: videoLength,
-                        personGeneration: "allow_all",
                         resolution: "720p"
                     }
                 });
